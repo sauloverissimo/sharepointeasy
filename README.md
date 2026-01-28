@@ -1,6 +1,6 @@
 # SharePointEasy
 
-Easy SharePoint file operations using Microsoft Graph API.
+✅ Easy SharePoint file operations using Microsoft Graph API. 🤙🏼
 
 [![PyPI version](https://badge.fury.io/py/sharepointeasy.svg)](https://badge.fury.io/py/sharepointeasy)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
