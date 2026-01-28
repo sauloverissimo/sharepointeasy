@@ -7,7 +7,7 @@ name = "sharepointeasy"
 version = "0.4.0"
 description = "Easy SharePoint file operations using Microsoft Graph API"
 readme = "README.md"
-license = "MIT"
+license = { file = "LICENSE" }
 requires-python = ">=3.10"
 authors = [
     { name = "Saulo Verissimo", email = "sauloverissimo@gmail.com" }
@@ -40,7 +40,7 @@ dev = [
     "ruff>=0.1.0",
 ]
 all = [
-    "sharepointeasy[rich]",
+    "rich>=13.0.0",
 ]
 
 [project.scripts]
@@ -54,10 +54,17 @@ Issues = "https://github.com/sauloverissimo/sharepointeasy/issues"
 Changelog = "https://github.com/sauloverissimo/sharepointeasy/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.sdist]
-include = ["src/sharepointeasy"]
+include = [
+    "src/sharepointeasy",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "pyproject.toml",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sharepointeasy"]
+include = ["src/sharepointeasy/py.typed"]
 
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""
