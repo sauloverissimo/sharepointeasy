@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sharepointeasy"
-version = "0.4.0"
+version = "1.0.0"
 description = "Easy SharePoint file operations using Microsoft Graph API"
 readme = "README.md"
 license = { file = "LICENSE" }
