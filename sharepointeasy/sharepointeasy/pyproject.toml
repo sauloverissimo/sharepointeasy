@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sharepointeasy"
+version = "0.4.0"
+description = "Easy SharePoint file operations using Microsoft Graph API"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Saulo Verissimo", email = "sauloverissimo@gmail.com" }
+]
+keywords = ["sharepoint", "microsoft", "graph", "api", "download", "upload", "async"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = [
+    "httpx>=0.25.0",
+    "msal>=1.24.0",
+]
+
+[project.optional-dependencies]
+rich = [
+    "rich>=13.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+]
+all = [
+    "sharepointeasy[rich]",
+]
+
+[project.scripts]
+sharepointeasy = "sharepointeasy.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/sauloverissimo/sharepointeasy"
+Repository = "https://github.com/sauloverissimo/sharepointeasy"
+Documentation = "https://github.com/sauloverissimo/sharepointeasy#readme"
+Issues = "https://github.com/sauloverissimo/sharepointeasy/issues"
+Changelog = "https://github.com/sauloverissimo/sharepointeasy/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.sdist]
+include = ["src/sharepointeasy"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sharepointeasy"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
