@@ -4,9 +4,11 @@ from .async_client import AsyncSharePointClient
 from .client import SharePointClient
 from .exceptions import (
     AuthenticationError,
+    CalendarError,
     DeleteError,
     DownloadError,
     DriveNotFoundError,
+    EventNotFoundError,
     FileNotFoundError,
     FolderCreateError,
     ListError,
@@ -41,6 +43,8 @@ __all__ = [
     "MoveError",
     "ShareError",
     "ListError",
+    "CalendarError",
+    "EventNotFoundError",
     # Utils
     "create_progress_callback",
     "create_batch_progress_callback",

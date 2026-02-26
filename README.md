@@ -17,6 +17,7 @@
 - **Retry & Resilience** - Automatic retry with exponential backoff
 - **Version History** - List and download file versions
 - **Sharing** - Create share links with permissions
+- **Calendar** - Access Outlook/Exchange calendars and events via Microsoft Graph
 
 ## Installation
 
@@ -238,6 +239,16 @@ SharePointClient(
 | `upload_by_id(drive_id, parent_id, filename, source)` | Upload file to folder by ID |
 | `delete_by_id(drive_id, item_id)` | Delete item by ID |
 
+#### Calendar / Events
+
+| Method | Description |
+|--------|-------------|
+| `list_user_calendars(user_id)` | List calendars for a user |
+| `list_user_events(user_id, ...)` | List events with filters (date range, subject, attendee) |
+| `list_all_user_events(user_id, ...)` | List all events with auto-pagination |
+| `get_user_event(user_id, event_id)` | Get a specific event by ID |
+| `search_meetings_with_attendee(user_id, attendee_email, ...)` | Search meetings by attendee |
+
 #### Microsoft Teams
 
 | Method | Description |
@@ -267,6 +278,8 @@ SharePointClient(
 | `MoveError` | Move/copy failed |
 | `ShareError` | Share link creation failed |
 | `ListError` | List operations failed |
+| `CalendarError` | Calendar operations failed |
+| `EventNotFoundError` | Event not found |
 
 ## Progress Tracking
 
@@ -318,6 +331,7 @@ To use this library, you need to register an app in Azure AD:
    - `Sites.ReadWrite.All` - Read and write sites (for upload, delete, etc.)
    - `Files.Read.All` - Read files
    - `Files.ReadWrite.All` - Read and write files
+   - `Calendars.Read` - Read calendars and events (for calendar features)
 8. Click **"Grant admin consent"**
 
 Your credentials:
@@ -443,6 +457,36 @@ client.batch_create_items(site["id"], lst["id"], [
     {"Title": "Task 2", "Status": "New"},
     {"Title": "Task 3", "Status": "New"},
 ])
+```
+
+### Calendar - List events and search meetings
+
+```python
+from sharepointeasy import SharePointClient
+
+client = SharePointClient()
+
+# List calendars
+calendars = client.list_user_calendars("user@company.com")
+
+# List events in a date range
+events = client.list_user_events(
+    user_id="user@company.com",
+    start_datetime="2025-01-01T00:00:00",
+    end_datetime="2025-12-31T23:59:59",
+    subject_contains="weekly sync",
+)
+
+# Search meetings with a specific attendee
+meetings = client.search_meetings_with_attendee(
+    user_id="user@company.com",
+    attendee_email="client@external.com",
+    start_datetime="2025-01-01T00:00:00",
+    end_datetime="2025-12-31T23:59:59",
+)
+
+for m in meetings:
+    print(f"{m['start']['dateTime'][:10]} - {m['subject']}")
 ```
 
 ### Async parallel downloads

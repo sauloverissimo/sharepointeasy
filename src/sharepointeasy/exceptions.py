@@ -71,3 +71,15 @@ class ListError(SharePointError):
     """Erro em operações com listas do SharePoint."""
 
     pass
+
+
+class CalendarError(SharePointError):
+    """Erro em operações com calendário."""
+
+    pass
+
+
+class EventNotFoundError(CalendarError):
+    """Evento de calendário não encontrado."""
+
+    pass

@@ -11,9 +11,11 @@ from msal import ConfidentialClientApplication
 
 from .exceptions import (
     AuthenticationError,
+    CalendarError,
     DeleteError,
     DownloadError,
     DriveNotFoundError,
+    EventNotFoundError,
     FileNotFoundError,
     FolderCreateError,
     ListError,
@@ -1065,6 +1067,272 @@ class AsyncSharePointClient:
                             progress_callback(downloaded, total_size)
 
         return destination
+
+    # =========================================================================
+    # Calendário / Eventos
+    # =========================================================================
+
+    async def list_user_calendars(self, user_id: str) -> list[dict]:
+        """
+        Lista calendários disponíveis para um usuário.
+
+        Args:
+            user_id: Email ou ID do usuário no Azure AD
+
+        Returns:
+            Lista de calendários com id, name, color e isDefaultCalendar
+
+        Raises:
+            CalendarError: Em caso de erro na requisição
+        """
+        url = f"{self.GRAPH_BASE_URL}/users/{user_id}/calendars"
+        try:
+            response = await self._request("GET", url)
+            response.raise_for_status()
+            return response.json().get("value", [])
+        except Exception as e:
+            raise CalendarError(f"Erro ao listar calendários de '{user_id}': {e}") from e
+
+    async def list_user_events(
+        self,
+        user_id: str,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        subject_contains: str | None = None,
+        attendee_email: str | None = None,
+        organizer_email: str | None = None,
+        is_online_meeting: bool | None = None,
+        calendar_id: str | None = None,
+        top: int | None = None,
+    ) -> list[dict]:
+        """
+        Lista eventos do calendário de um usuário.
+
+        Quando start_datetime e end_datetime são fornecidos, usa calendarView
+        (que expande eventos recorrentes). Caso contrário, usa /events.
+
+        Args:
+            user_id: Email ou ID do usuário no Azure AD
+            start_datetime: Início do período (ISO 8601, ex: "2025-01-01T00:00:00")
+            end_datetime: Fim do período (ISO 8601, ex: "2025-12-31T23:59:59")
+            subject_contains: Filtra eventos cujo título contém esta palavra-chave
+            attendee_email: Filtra eventos onde este email está nos participantes
+            organizer_email: Filtra eventos organizados por este email
+            is_online_meeting: True para apenas reuniões online, False para presenciais
+            calendar_id: ID do calendário específico (padrão: calendário principal)
+            top: Limite de resultados retornados
+
+        Returns:
+            Lista de eventos com subject, start, end, attendees, organizer, etc.
+
+        Raises:
+            CalendarError: Em caso de erro na requisição
+        """
+        if calendar_id:
+            base_path = f"/users/{user_id}/calendars/{calendar_id}"
+        else:
+            base_path = f"/users/{user_id}"
+
+        params = []
+
+        if start_datetime and end_datetime:
+            url = f"{self.GRAPH_BASE_URL}{base_path}/calendarView"
+            params.append(f"startDateTime={start_datetime}")
+            params.append(f"endDateTime={end_datetime}")
+        else:
+            url = f"{self.GRAPH_BASE_URL}{base_path}/events"
+
+        filters = []
+        if subject_contains:
+            filters.append(f"contains(subject, '{subject_contains}')")
+        if filters:
+            params.append(f"$filter={' and '.join(filters)}")
+        if top:
+            params.append(f"$top={top}")
+
+        if params:
+            url += "?" + "&".join(params)
+
+        try:
+            response = await self._request("GET", url)
+            response.raise_for_status()
+            events = response.json().get("value", [])
+        except Exception as e:
+            raise CalendarError(f"Erro ao listar eventos de '{user_id}': {e}") from e
+
+        if attendee_email:
+            events = [
+                e for e in events
+                if any(
+                    a.get("emailAddress", {}).get("address", "").lower() == attendee_email.lower()
+                    for a in e.get("attendees", [])
+                )
+            ]
+        if organizer_email:
+            events = [
+                e for e in events
+                if e.get("organizer", {}).get("emailAddress", {}).get("address", "").lower()
+                == organizer_email.lower()
+            ]
+        if is_online_meeting is not None:
+            events = [e for e in events if e.get("isOnlineMeeting") == is_online_meeting]
+
+        return events
+
+    async def list_all_user_events(
+        self,
+        user_id: str,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        subject_contains: str | None = None,
+        attendee_email: str | None = None,
+        organizer_email: str | None = None,
+        is_online_meeting: bool | None = None,
+        calendar_id: str | None = None,
+    ) -> list[dict]:
+        """
+        Lista TODOS os eventos do calendário com paginação automática.
+
+        Igual a list_user_events, mas segue @odata.nextLink até buscar
+        todas as páginas de resultados.
+
+        Args:
+            user_id: Email ou ID do usuário no Azure AD
+            start_datetime: Início do período (ISO 8601)
+            end_datetime: Fim do período (ISO 8601)
+            subject_contains: Filtra pelo título do evento
+            attendee_email: Filtra por participante
+            organizer_email: Filtra por organizador
+            is_online_meeting: True para reuniões online, False para presenciais
+            calendar_id: ID do calendário específico
+
+        Returns:
+            Lista completa de eventos
+
+        Raises:
+            CalendarError: Em caso de erro na requisição
+        """
+        if calendar_id:
+            base_path = f"/users/{user_id}/calendars/{calendar_id}"
+        else:
+            base_path = f"/users/{user_id}"
+
+        params = []
+
+        if start_datetime and end_datetime:
+            url = f"{self.GRAPH_BASE_URL}{base_path}/calendarView"
+            params.append(f"startDateTime={start_datetime}")
+            params.append(f"endDateTime={end_datetime}")
+        else:
+            url = f"{self.GRAPH_BASE_URL}{base_path}/events"
+
+        filters = []
+        if subject_contains:
+            filters.append(f"contains(subject, '{subject_contains}')")
+        if filters:
+            params.append(f"$filter={' and '.join(filters)}")
+
+        if params:
+            url += "?" + "&".join(params)
+
+        all_events = []
+        try:
+            while url:
+                response = await self._request("GET", url)
+                response.raise_for_status()
+                data = response.json()
+                all_events.extend(data.get("value", []))
+                url = data.get("@odata.nextLink")
+        except Exception as e:
+            raise CalendarError(f"Erro ao listar todos os eventos de '{user_id}': {e}") from e
+
+        if attendee_email:
+            all_events = [
+                e for e in all_events
+                if any(
+                    a.get("emailAddress", {}).get("address", "").lower() == attendee_email.lower()
+                    for a in e.get("attendees", [])
+                )
+            ]
+        if organizer_email:
+            all_events = [
+                e for e in all_events
+                if e.get("organizer", {}).get("emailAddress", {}).get("address", "").lower()
+                == organizer_email.lower()
+            ]
+        if is_online_meeting is not None:
+            all_events = [e for e in all_events if e.get("isOnlineMeeting") == is_online_meeting]
+
+        return all_events
+
+    async def get_user_event(self, user_id: str, event_id: str) -> dict:
+        """
+        Obtém um evento específico pelo ID.
+
+        Args:
+            user_id: Email ou ID do usuário no Azure AD
+            event_id: ID do evento
+
+        Returns:
+            Dados do evento
+
+        Raises:
+            EventNotFoundError: Se o evento não for encontrado
+            CalendarError: Em caso de outros erros
+        """
+        url = f"{self.GRAPH_BASE_URL}/users/{user_id}/events/{event_id}"
+        try:
+            response = await self._request("GET", url)
+            if response.status_code == 404:
+                raise EventNotFoundError(f"Evento '{event_id}' não encontrado para o usuário '{user_id}'")
+            response.raise_for_status()
+            return response.json()
+        except EventNotFoundError:
+            raise
+        except Exception as e:
+            raise CalendarError(f"Erro ao obter evento '{event_id}': {e}") from e
+
+    async def search_meetings_with_attendee(
+        self,
+        user_id: str,
+        attendee_email: str,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        subject_contains: str | None = None,
+        organizer_email: str | None = None,
+        is_online_meeting: bool | None = None,
+    ) -> list[dict]:
+        """
+        Busca reuniões em que um participante específico está presente.
+
+        Método de conveniência para levantamento de reuniões com clientes.
+        Busca todos os eventos (com paginação automática) e filtra pelo
+        email do participante informado.
+
+        Args:
+            user_id: Email ou ID do usuário cujo calendário será consultado
+            attendee_email: Email do participante/cliente a buscar
+            start_datetime: Início do período (ISO 8601, ex: "2025-01-01T00:00:00")
+            end_datetime: Fim do período (ISO 8601, ex: "2025-12-31T23:59:59")
+            subject_contains: Filtra pelo título/assunto da reunião
+            organizer_email: Filtra pelo organizador da reunião
+            is_online_meeting: True para apenas reuniões online
+
+        Returns:
+            Lista de reuniões com o participante informado
+
+        Raises:
+            CalendarError: Em caso de erro na requisição
+        """
+        return await self.list_all_user_events(
+            user_id=user_id,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            subject_contains=subject_contains,
+            attendee_email=attendee_email,
+            organizer_email=organizer_email,
+            is_online_meeting=is_online_meeting,
+        )
 
     # =========================================================================
     # Métodos de conveniência
